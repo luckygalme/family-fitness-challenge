@@ -37,11 +37,8 @@ conn = init_db()
 st.set_page_config(page_title="Family Fitness Challenge", page_icon="💪", layout="centered")
 
 # Custom CSS for Mobile App-like Bottom Navigation
-# st.markdown("""
-    <style>
-    .stButton>button { width: 100%; border-radius: 10px; }
-    .highlight-box { background-color: #f0f7f4; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; }
-    </style>
+st.markdown("<style>.stButton>button { width: 100%; border-radius: 10px; } .highlight-box { background-color: #f0f7f4; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; }</style>", unsafe_allow_html=True)
+
 # Instead of:
 # st.markdown(f"<div class='highlight-box'>📅 <b>Current Week:</b> {sun.strftime('%b %d')} to {sat.strftime('%b %d')} (Resets Sunday)</div>", unsafe_allow_html=True)
 
