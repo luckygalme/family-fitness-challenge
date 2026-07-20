@@ -99,6 +99,9 @@ if st.session_state.user is None:
 st.title(f"🏆 Family Challenge")
 st.caption(f"Logged in as: **{st.session_state.user.capitalize()}**")
 
+# Calculate current week variables right away so the whole app can use them
+sun, sat = get_current_week_range()
+
 # Bottom Navigation Emulation via Columns
 col1, col2, col3, col4 = st.columns(4)
 with col1: 
@@ -109,6 +112,14 @@ with col3:
     if st.button("⚙️ Setup"): st.session_state.current_tab = "⚙️ Setup"
 with col4: 
     if st.button("📊 Stats"): st.session_state.current_tab = "📊 Stats"
+
+st.divider()
+
+# --- TAB 1: LEADERBOARD ---
+if st.session_state.current_tab == "🏆 Leaderboard":
+    st.subheader("Family Progress Dashboard")
+    st.markdown(f"<div class='highlight-box'>📅 <b>Current Week:</b> {sun.strftime('%b %d')} to {sat.strftime('%b %d')} (Resets Sunday)</div>", unsafe_allow_html=True)
+    st.write("")
 
 st.divider()
 
