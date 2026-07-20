@@ -42,7 +42,15 @@ st.markdown("""
     .stButton>button { width: 100%; border-radius: 10px; }
     .highlight-box { background-color: #f0f7f4; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; }
     </style>
-""", unsafe_scale=True)
+# Instead of:
+# st.markdown(f"<div class='highlight-box'>📅 <b>Current Week:</b> {sun.strftime('%b %d')} to {sat.strftime('%b %d')} (Resets Sunday)</div>", unsafe_allow_html=True)
+
+st.markdown(f"📅 **Current Week:** {sun.strftime('%b %d')} to {sat.strftime('%b %d')} (Resets Sunday)")
+
+# Or if you need custom styling:
+from markupsafe import escape
+safe_username = escape(user)
+st.markdown(f"<div class='highlight-box'>{safe_username}</div>", unsafe_allow_html=True)
 
 # --- AUTHENTICATION STATE ---
 if 'user' not in st.session_state:
