@@ -37,7 +37,7 @@ conn = init_db()
 st.set_page_config(page_title="Family Fitness Challenge", page_icon="💪", layout="centered")
 
 # Custom CSS for Mobile App-like Bottom Navigation
-st.markdown("""
+# st.markdown("""
     <style>
     .stButton>button { width: 100%; border-radius: 10px; }
     .highlight-box { background-color: #f0f7f4; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; }
