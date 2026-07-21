@@ -50,10 +50,9 @@ def is_editable(created_at_str):
 # --- APP CONFIG & STYLING ---
 st.set_page_config(page_title="Family Fitness Challenge", page_icon="💪", layout="centered")
 
-# Flat CSS string to absolutely avoid python indentation bugs
+# Flat CSS string to avoid python indentation bugs
 st.markdown("<style>.stButton>button { width: 100%; border-radius: 10px; } .highlight-box { background-color: #f0f7f4; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; }</style>", unsafe_allow_html=True)
 
-# Define current week variables globally at the top level so all blocks can access them safely
 sun, sat = get_current_week_range()
 
 # --- AUTHENTICATION STATE ---
@@ -169,7 +168,10 @@ if st.session_state.current_tab == "🏆 Leaderboard":
 # --- TAB 2: DAILY LOG ---
 elif st.session_state.current_tab == "📝 Daily Log":
     st.subheader("Log Your Progress")
-    log_date = st.date_input("Date to log for", datetime.date.today())
+    
+    # Date picker allows selecting any day to update or backfill
+    log_date = st.date_input("Select Date to Log For", datetime.date.today())
+    date_str = log_date.isoformat()
     
     c = conn.cursor()
     c.execute("SELECT challenge_num, goal_type, goal_desc FROM challenges WHERE username=?", (st.session_state.user,))
@@ -178,43 +180,44 @@ elif st.session_state.current_tab == "📝 Daily Log":
     if not my_challenges:
         st.warning("Please set up your challenges first in the Setup tab!")
     else:
-        with st.form("log_form"):
+        # Keying the form by date string forces Streamlit to reload fresh inputs whenever the date changes
+        with st.form(f"log_form_{date_str}"):
             for num, g_type, desc in my_challenges:
                 st.markdown(f"#### Log for: *{desc}*")
                 
                 c.execute("SELECT status, current_numeric_val FROM logs WHERE username=? AND challenge_num=? AND date=?", 
-                          (st.session_state.user, num, log_date.isoformat()))
+                          (st.session_state.user, num, date_str))
                 existing = c.fetchone()
                 
-                existing_status = existing[0] if existing else "failed"
+                existing_status = existing[0] if existing else None
                 existing_num = existing[1] if existing else 0.0
                 
-                # Setup unique keys safely
-                skip = st.checkbox("Exclude/Skip this day (Won't count against you)", value=(existing_status == 'skipped'), key=f"skip_{num}")
+                # Checkboxes & inputs use date-specific keys so switching dates refreshes state smoothly
+                skip = st.checkbox("Exclude/Skip this day (Won't count against you)", value=(existing_status == 'skipped'), key=f"skip_{num}_{date_str}")
                 
                 if g_type == "Weight / Numeric Goal":
-                    val = st.number_input("Current Value / Weight", value=float(existing_num) if existing_num else 0.0, key=f"val_{num}")
+                    val = st.number_input("Current Value / Weight", value=float(existing_num) if existing_num else 0.0, key=f"val_{num}_{date_str}")
                 else:
-                    done = st.checkbox("I completed this goal today!", value=(existing_status == 'completed'), key=f"done_{num}")
+                    done = st.checkbox("I completed this goal today!", value=(existing_status == 'completed'), key=f"done_{num}_{date_str}")
                     
-            if st.form_submit_button("Save Today's Logs"):
+            if st.form_submit_button(f"Save Logs for {log_date.strftime('%b %d')}"):
                 for num, g_type, desc in my_challenges:
-                    is_skipped = st.session_state[f"skip_{num}"]
+                    is_skipped = st.session_state[f"skip_{num}_{date_str}"]
                     
                     if is_skipped:
                         status = 'skipped'
                         num_val = None
                     elif g_type == "Weight / Numeric Goal":
                         status = 'completed'
-                        num_val = st.session_state[f"val_{num}"]
+                        num_val = st.session_state[f"val_{num}_{date_str}"]
                     else:
-                        status = 'completed' if st.session_state[f"done_{num}"] else 'failed'
+                        status = 'completed' if st.session_state[f"done_{num}_{date_str}"] else 'failed'
                         num_val = None
                         
                     c.execute('''INSERT OR REPLACE INTO logs (username, challenge_num, date, status, current_numeric_val) 
-                                 VALUES (?, ?, ?, ?, ?)''', (st.session_state.user, num, log_date.isoformat(), status, num_val))
+                                 VALUES (?, ?, ?, ?, ?)''', (st.session_state.user, num, date_str, status, num_val))
                 conn.commit()
-                st.success("Progress saved successfully!")
+                st.success(f"Progress saved for {log_date.strftime('%b %d')}!")
 
 # --- TAB 3: CHALLENGE SETUP ---
 elif st.session_state.current_tab == "⚙️ Setup":
@@ -290,4 +293,3 @@ elif st.session_state.current_tab == "📊 Stats":
         st.markdown("### 🏅 Current Standings (Total Days Completed)")
         for rank, (user, total) in enumerate(leaderboard_data, 1):
             st.write(f"**#{rank} {user.capitalize()}** — {total} total metrics accomplished!")
-    
