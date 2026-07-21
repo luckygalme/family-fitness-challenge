@@ -158,7 +158,7 @@ if st.session_state.current_tab == "🏆 Leaderboard":
                     
                 else: # Daily Habit
                     total_days_completed = sum(1 for l in all_logs if l[0] == 'completed')
-                    st.write(f"Total successful days overall: `{total_days_completed} days` 🎉")
+                    st.write(f"Total challenges completed overall: `{total_days_completed}` 🎉")
             st.divider()
 
 # --- TAB 2: DAILY LOG ---
@@ -305,7 +305,7 @@ elif st.session_state.current_tab == "📊 Stats":
     st.divider()
     
     if selected_view == "🏆 Overall 6-Week Standings":
-        st.markdown("### 🏅 Overall Leaderboard (Total Completed Days)")
+        st.markdown("### 🏅 Overall Leaderboard (Challenges Completed)")
         c.execute("""SELECT username, COUNT(CASE WHEN status='completed' THEN 1 END) as completed_days 
                      FROM logs GROUP BY username ORDER BY completed_days DESC""")
         leaderboard_data = c.fetchall()
@@ -315,7 +315,7 @@ elif st.session_state.current_tab == "📊 Stats":
         else:
             for rank, (user, total) in enumerate(leaderboard_data, 1):
                 badge = "👑 " if rank == 1 else ""
-                st.write(f"**#{rank} {badge}{user.capitalize()}** — {total} total completed days!")
+                st.write(f"**#{rank} {badge}{user.capitalize()}** — {total} challenges completed!")
     else:
         # Extract selected week dates
         selected_index = week_options.index(selected_view) - 1
@@ -336,9 +336,9 @@ elif st.session_state.current_tab == "📊 Stats":
             winners = [u.capitalize() for u, count in week_data if count == top_score and count > 0]
             
             if winners:
-                st.success(f"🎉 **Week {w_num} Winner(s):** {', '.join(winners)} ({top_score} completions!)")
+                st.success(f"🎉 **Week {w_num} Winner(s):** {', '.join(winners)} ({top_score} challenges completed!)")
             
             st.markdown("#### Weekly Standings:")
             for rank, (user, total) in enumerate(week_data, 1):
-                st.write(f"**#{rank} {user.capitalize()}** — {total} days logged")
+                st.write(f"**#{rank} {user.capitalize()}** — {total} challenges completed")
                 
