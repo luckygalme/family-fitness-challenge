@@ -7,9 +7,7 @@ import pandas as pd
 def init_db():
     conn = sqlite3.connect('family_fitness.db', check_same_thread=False)
     c = conn.cursor()
-    # Users table
     c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
-    # Challenges table
     c.execute('''CREATE TABLE IF NOT EXISTS challenges (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT,
@@ -20,12 +18,11 @@ def init_db():
                     start_val REAL,
                     weekly_target_days INTEGER,
                     created_at TEXT)''')
-    # Daily Logs table
     c.execute('''CREATE TABLE IF NOT EXISTS logs (
                     username TEXT,
                     challenge_num INTEGER,
                     date TEXT,
-                    status TEXT, -- 'completed', 'skipped', 'failed'
+                    status TEXT,
                     current_numeric_val REAL,
                     PRIMARY KEY (username, challenge_num, date))''')
     conn.commit()
@@ -49,8 +46,6 @@ def is_editable(created_at_str):
 
 # --- APP CONFIG & STYLING ---
 st.set_page_config(page_title="Family Fitness Challenge", page_icon="💪", layout="centered")
-
-# Flat CSS string to avoid python indentation bugs
 st.markdown("<style>.stButton>button { width: 100%; border-radius: 10px; } .highlight-box { background-color: #f0f7f4; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; }</style>", unsafe_allow_html=True)
 
 sun, sat = get_current_week_range()
@@ -58,6 +53,7 @@ sun, sat = get_current_week_range()
 # --- AUTHENTICATION STATE ---
 if 'user' not in st.session_state:
     st.session_state.user = None
+if 'current_tab' not in st.session_state:
     st.session_state.current_tab = "🏆 Leaderboard"
 
 # --- AUTH INTERFACE ---
@@ -87,7 +83,7 @@ if st.session_state.user is None:
     st.stop()
 
 # --- LOGGED IN APP INTERFACE ---
-st.title(f"🏆 Family Challenge")
+st.title("🏆 Family Challenge")
 st.caption(f"Logged in as: **{st.session_state.user.capitalize()}**")
 
 # Bottom Navigation Emulation via Columns
@@ -169,7 +165,6 @@ if st.session_state.current_tab == "🏆 Leaderboard":
 elif st.session_state.current_tab == "📝 Daily Log":
     st.subheader("Log Your Progress")
     
-    # Date picker allows selecting any day to update or backfill
     log_date = st.date_input("Select Date to Log For", datetime.date.today())
     date_str = log_date.isoformat()
     
@@ -180,7 +175,6 @@ elif st.session_state.current_tab == "📝 Daily Log":
     if not my_challenges:
         st.warning("Please set up your challenges first in the Setup tab!")
     else:
-        # Keying the form by date string forces Streamlit to reload fresh inputs whenever the date changes
         with st.form(f"log_form_{date_str}"):
             for num, g_type, desc in my_challenges:
                 st.markdown(f"#### Log for: *{desc}*")
@@ -192,7 +186,6 @@ elif st.session_state.current_tab == "📝 Daily Log":
                 existing_status = existing[0] if existing else None
                 existing_num = existing[1] if existing else 0.0
                 
-                # Checkboxes & inputs use date-specific keys so switching dates refreshes state smoothly
                 skip = st.checkbox("Exclude/Skip this day (Won't count against you)", value=(existing_status == 'skipped'), key=f"skip_{num}_{date_str}")
                 
                 if g_type == "Weight / Numeric Goal":
@@ -283,13 +276,69 @@ elif st.session_state.current_tab == "📊 Stats":
     st.subheader("Challenge Performance History")
     
     c = conn.cursor()
-    c.execute("""SELECT username, COUNT(CASE WHEN status='completed' THEN 1 END) as completed_days 
-                 FROM logs GROUP BY username ORDER BY completed_days DESC""")
-    leaderboard_data = c.fetchall()
     
-    if not leaderboard_data:
-        st.info("No historical data to display yet.")
+    # Check earliest log date or challenge creation to anchor Week 1
+    c.execute("SELECT MIN(created_at) FROM challenges")
+    earliest_res = c.fetchone()
+    
+    if earliest_res and earliest_res[0]:
+        first_date = datetime.datetime.strptime(earliest_res[0], "%Y-%m-%d %H:%M:%S").date()
     else:
-        st.markdown("### 🏅 Current Standings (Total Days Completed)")
-        for rank, (user, total) in enumerate(leaderboard_data, 1):
-            st.write(f"**#{rank} {user.capitalize()}** — {total} total metrics accomplished!")
+        first_date = datetime.date.today()
+        
+    # Align Week 1 start to the Sunday on or before first creation
+    idx = (first_date.weekday() + 1) % 7 
+    w1_start = first_date - datetime.timedelta(days=idx)
+    
+    # Generate 6 weekly periods
+    weeks = []
+    for w in range(6):
+        w_s = w1_start + datetime.timedelta(weeks=w)
+        w_e = w_s + datetime.timedelta(days=6)
+        weeks.append((w + 1, w_s, w_e))
+        
+    # Dropdown selector to view specific weeks or Overall
+    week_options = [f"Week {w_num} ({w_s.strftime('%b %d')} - {w_e.strftime('%b %d')})" for w_num, w_s, w_e in weeks]
+    week_options.insert(0, "🏆 Overall 6-Week Standings")
+    
+    selected_view = st.selectbox("Select Timeframe to Inspect", week_options)
+    st.divider()
+    
+    if selected_view == "🏆 Overall 6-Week Standings":
+        st.markdown("### 🏅 Overall Leaderboard (Total Completed Days)")
+        c.execute("""SELECT username, COUNT(CASE WHEN status='completed' THEN 1 END) as completed_days 
+                     FROM logs GROUP BY username ORDER BY completed_days DESC""")
+        leaderboard_data = c.fetchall()
+        
+        if not leaderboard_data:
+            st.info("No historical logs recorded yet.")
+        else:
+            for rank, (user, total) in enumerate(leaderboard_data, 1):
+                badge = "👑 " if rank == 1 else ""
+                st.write(f"**#{rank} {badge}{user.capitalize()}** — {total} total completed days!")
+    else:
+        # Extract selected week dates
+        selected_index = week_options.index(selected_view) - 1
+        w_num, w_s, w_e = weeks[selected_index]
+        
+        st.markdown(f"### 📅 Week {w_num} Breakdown")
+        st.caption(f"{w_s.strftime('%B %d, %Y')} to {w_e.strftime('%B %d, %Y')}")
+        
+        c.execute("""SELECT username, COUNT(CASE WHEN status='completed' THEN 1 END) as completed_days 
+                     FROM logs WHERE date BETWEEN ? AND ? 
+                     GROUP BY username ORDER BY completed_days DESC""", (w_s.isoformat(), w_e.isoformat()))
+        week_data = c.fetchall()
+        
+        if not week_data:
+            st.info("No logs recorded for this week yet.")
+        else:
+            top_score = week_data[0][1]
+            winners = [u.capitalize() for u, count in week_data if count == top_score and count > 0]
+            
+            if winners:
+                st.success(f"🎉 **Week {w_num} Winner(s):** {', '.join(winners)} ({top_score} completions!)")
+            
+            st.markdown("#### Weekly Standings:")
+            for rank, (user, total) in enumerate(week_data, 1):
+                st.write(f"**#{rank} {user.capitalize()}** — {total} days logged")
+                
